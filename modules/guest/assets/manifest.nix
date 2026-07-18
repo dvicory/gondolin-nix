@@ -39,9 +39,35 @@
       source_date_epoch="''${SOURCE_DATE_EPOCH:-1}"
       build_time="$(${pkgs.coreutils}/bin/date -u -d "@$source_date_epoch" +%Y-%m-%dT%H:%M:%SZ)"
 
-      # TODO(gondolin-nix): add optional support for buildId/runtimeDefaults/ociSource
+      # Deterministic, content-derived build ID using the exact semantics of
+      # Gondolin's computeAssetBuildId: UUIDv5 (RFC 4122, SHA-1) over the
+      # newline-joined asset checksums and arch in a fixed namespace. The guest
+      # helper stack and manifest configuration are covered transitively
+      # because every guest module knob flows into one of the three artifact
+      # checksums.
+      build_id="$(
+        GONDOLIN_KERNEL_SUM="$kernel_checksum" \
+        GONDOLIN_INITRAMFS_SUM="$initramfs_checksum" \
+        GONDOLIN_ROOTFS_SUM="$rootfs_checksum" \
+        GONDOLIN_ARCH="${arch}" \
+        ${pkgs.python3}/bin/python3 -c '
+      import os, uuid
+      ns = uuid.UUID("7b6ed0c0-7e7f-4c2a-8b2d-0bf3d5be9d52")
+      name = "\n".join([
+          "gondolin-asset-build",
+          "kernel=" + os.environ["GONDOLIN_KERNEL_SUM"],
+          "initramfs=" + os.environ["GONDOLIN_INITRAMFS_SUM"],
+          "rootfs=" + os.environ["GONDOLIN_ROOTFS_SUM"],
+          "arch=" + os.environ["GONDOLIN_ARCH"],
+      ])
+      print(uuid.uuid5(ns, name))
+      '
+      )"
+
+      # TODO(gondolin-nix): add optional support for runtimeDefaults/ociSource
       # and schema-backed validation in checks.
       ${pkgs.jq}/bin/jq -n \
+        --arg buildId "$build_id" \
         --arg kernel "vmlinuz-virt" \
         --arg initramfs "initramfs.cpio.lz4" \
         --arg rootfs "rootfs.ext4" \
@@ -52,6 +78,7 @@
         --argjson config '${manifestConfigJson}' \
         '{
           version: 1,
+          buildId: $buildId,
           buildTime: $buildTime,
           config: $config,
           assets: {
