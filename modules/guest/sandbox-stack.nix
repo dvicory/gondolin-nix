@@ -111,6 +111,10 @@ lib.mkIf cfg.enable {
       ExecStart = script;
       Restart = "on-failure";
       RestartSec = "2s";
+      # Forward stack stderr/stdout to the serial console so sandboxfs and
+      # sandboxd failures are visible in the host-side QEMU log.
+      StandardOutput = "journal+console";
+      StandardError = "journal+console";
     };
   };
 }
