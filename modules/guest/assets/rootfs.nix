@@ -43,6 +43,12 @@
       chmod u+w "$root/etc"
       touch "$root/etc/NIXOS"
 
+      # /lib/modules so modprobe and systemd-modules-load can find kernel
+      # modules (e.g. fuse). Real NixOS creates this symlink during system
+      # activation; the guest never activates, so bake it into the image.
+      mkdir -p "$root/lib"
+      ln -s ${config.system.build.toplevel}/kernel-modules/lib/modules "$root/lib/modules"
+
       if [ -n "${if diskSizeMb == null then "" else toString diskSizeMb}" ]; then
         size_mb="${if diskSizeMb == null then "" else toString diskSizeMb}"
       else

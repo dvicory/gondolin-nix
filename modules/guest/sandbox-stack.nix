@@ -95,6 +95,7 @@ lib.mkIf cfg.enable {
     path = [
       pkgs.coreutils
       pkgs.gnugrep
+      pkgs.kmod
     ];
     after = [
       "local-fs.target"
