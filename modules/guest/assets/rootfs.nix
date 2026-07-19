@@ -20,7 +20,7 @@
       set -euo pipefail
 
       root="$TMPDIR/root"
-      mkdir -p "$root/nix/store" "$root/nix/var/nix/profiles" "$root/etc"
+      mkdir -p "$root/nix/store" "$root/nix/var/nix/profiles"
 
       while IFS= read -r p; do
         [ -n "$p" ] || continue
@@ -30,6 +30,13 @@
 
       ln -s ${config.system.build.toplevel} "$root/nix/var/nix/profiles/system-1-link"
       ln -s system-1-link "$root/nix/var/nix/profiles/system"
+
+      # The guest boot path executes the toplevel init directly; nothing
+      # else populates /etc. Copy the toplevel /etc tree (units, os-release,
+      # profile fragments) so systemd finds its unit files at boot. cp -a
+      # preserves the absolute /nix/store symlinks, which resolve inside the
+      # guest because the store is in the rootfs.
+      cp -a ${config.system.build.etc}/etc "$root/etc"
       touch "$root/etc/NIXOS"
 
       if [ -n "${if diskSizeMb == null then "" else toString diskSizeMb}" ]; then
