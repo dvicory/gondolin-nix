@@ -36,8 +36,11 @@
       # profile fragments) so systemd finds its unit files at boot. cp -a
       # preserves the absolute /nix/store symlinks, which resolve inside the
       # guest because the store is in the rootfs.
+      # The toplevel /etc tree is a symlink farm into the store; read-only
+      # is correct for boot (that is how NixOS /etc works everywhere).
+      # Only the top directory needs to be writable for the marker file.
       cp -a ${config.system.build.etc}/etc "$root/etc"
-      chmod -R u+w "$root/etc"
+      chmod u+w "$root/etc"
       touch "$root/etc/NIXOS"
 
       if [ -n "${if diskSizeMb == null then "" else toString diskSizeMb}" ]; then
