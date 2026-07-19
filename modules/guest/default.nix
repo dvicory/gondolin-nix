@@ -34,6 +34,31 @@ in
     boot.loader.grub.devices = lib.mkDefault [ "/dev/vda" ];
     system.stateVersion = lib.mkDefault "25.11";
 
+    # Baseline userland for guest shells and execs. The guest never runs
+    # NixOS system activation, so /run/current-system (which /etc/profile
+    # puts on PATH) is wired up via the tmpfiles links below instead.
+    environment.systemPackages = with pkgs; [
+      bashInteractive
+      coreutils
+      curl
+      findutils
+      gawk
+      git
+      gnugrep
+      gnused
+      iproute2
+      iputils
+      kmod
+      procps
+      util-linux
+    ];
+
+    systemd.tmpfiles.rules = [
+      "L+ /run/current-system - - - - ${config.system.build.toplevel}"
+      "L+ /run/booted-system - - - - ${config.system.build.toplevel}"
+      "d /root 0700 root root -"
+    ];
+
     assertions = [
       {
         assertion = pkgs.stdenv.hostPlatform.isLinux;
