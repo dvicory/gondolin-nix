@@ -37,6 +37,7 @@
       # preserves the absolute /nix/store symlinks, which resolve inside the
       # guest because the store is in the rootfs.
       cp -a ${config.system.build.etc}/etc "$root/etc"
+      chmod -R u+w "$root/etc"
       touch "$root/etc/NIXOS"
 
       if [ -n "${if diskSizeMb == null then "" else toString diskSizeMb}" ]; then
