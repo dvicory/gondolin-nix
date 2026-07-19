@@ -54,8 +54,11 @@ in
     ];
 
     systemd.tmpfiles.rules = [
-      "L+ /run/current-system - - - - ${config.system.build.toplevel}"
-      "L+ /run/booted-system - - - - ${config.system.build.toplevel}"
+      # Indirect through the profile link the rootfs builder creates;
+      # referencing config.system.build.toplevel here would recurse
+      # (tmpfiles rules contribute to the toplevel derivation itself).
+      "L+ /run/current-system - - - - /nix/var/nix/profiles/system"
+      "L+ /run/booted-system - - - - /nix/var/nix/profiles/system"
       "d /root 0700 root root -"
     ];
 
