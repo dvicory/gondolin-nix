@@ -1,7 +1,7 @@
 { lib
 , stdenvNoCC
 , fetchFromGitHub
-, fetchurl
+, zig
 }:
 
 let
@@ -14,36 +14,27 @@ let
     rev = "v${version}";
     hash = "sha256-H+gIgvaLQq1nurv4OV9RnS8SEglDB2ExY9OZxwzr79k=";
   };
-
-  zigArchive = {
-    x86_64-linux = {
-      url = "https://ziglang.org/download/0.15.1/zig-x86_64-linux-0.15.1.tar.xz";
-      hash = "sha256-xhxdpu3uoUylHs1eRSDG9Bie9SUDg9sz0BhIKTv6/gU=";
-      dir = "zig-x86_64-linux-0.15.1";
-    };
-    aarch64-linux = {
-      url = "https://ziglang.org/download/0.15.1/zig-aarch64-linux-0.15.1.tar.xz";
-      hash = "sha256-u0qNKtc15/unZMSX3fQkPLEp/s5BSNoyIqcEbT8fGf4=";
-      dir = "zig-aarch64-linux-0.15.1";
-    };
-  }.${stdenvNoCC.buildPlatform.system} or (throw "gondolin-guest-bins is only supported on x86_64-linux and aarch64-linux");
-
-  zig = fetchurl {
-    inherit (zigArchive) url hash;
-  };
 in
+
+# gondolin 0.12.0's guest daemons declare minimum_zig_version 0.16.0 in
+# guest/build.zig.zon (they use std.Io.Threaded, which 0.15.x lacks).
+# Compile with nixpkgs' zig — one shared package set instead of a
+# separately fetched toolchain — and fail closed on an older nixpkgs.
+assert lib.assertMsg (lib.versionAtLeast zig.version "0.16.0")
+  "gondolin-guest-bins requires zig >= 0.16.0 (got ${zig.version})";
+
 stdenvNoCC.mkDerivation {
   inherit pname version src;
 
   sourceRoot = "source/guest";
+
+  nativeBuildInputs = [ zig ];
 
   dontConfigure = true;
 
   buildPhase = ''
     runHook preBuild
 
-    tar -xf ${zig}
-    export PATH="$PWD/${zigArchive.dir}:$PATH"
     export ZIG_GLOBAL_CACHE_DIR="$TMPDIR/zig-global-cache"
     export XDG_CACHE_HOME="$TMPDIR"
 
