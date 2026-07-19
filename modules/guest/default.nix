@@ -38,7 +38,6 @@ in
     # NixOS system activation, so /run/current-system (which /etc/profile
     # puts on PATH) is wired up via the tmpfiles links below instead.
     environment.systemPackages = with pkgs; [
-      bashInteractive
       coreutils
       curl
       findutils
@@ -48,7 +47,6 @@ in
       gnused
       iproute2
       iputils
-      kmod
       procps
       util-linux
     ];
