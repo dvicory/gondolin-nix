@@ -1,6 +1,7 @@
 { lib
 , stdenvNoCC
 , fetchFromGitHub
+, zig_0_16 ? null
 , zig
 }:
 
@@ -14,21 +15,24 @@ let
     rev = "v${version}";
     hash = "sha256-H+gIgvaLQq1nurv4OV9RnS8SEglDB2ExY9OZxwzr79k=";
   };
+
+  # Prefer the explicit 0.16 package when the nixpkgs set provides it.
+  zigCompiler = if zig_0_16 != null then zig_0_16 else zig;
 in
 
 # gondolin 0.12.0's guest daemons declare minimum_zig_version 0.16.0 in
 # guest/build.zig.zon (they use std.Io.Threaded, which 0.15.x lacks).
 # Compile with nixpkgs' zig — one shared package set instead of a
 # separately fetched toolchain — and fail closed on an older nixpkgs.
-assert lib.assertMsg (lib.versionAtLeast zig.version "0.16.0")
-  "gondolin-guest-bins requires zig >= 0.16.0 (got ${zig.version})";
+assert lib.assertMsg (lib.versionAtLeast zigCompiler.version "0.16.0")
+  "gondolin-guest-bins requires zig >= 0.16.0 (got ${zigCompiler.version})";
 
 stdenvNoCC.mkDerivation {
   inherit pname version src;
 
   sourceRoot = "source/guest";
 
-  nativeBuildInputs = [ zig ];
+  nativeBuildInputs = [ zigCompiler ];
 
   dontConfigure = true;
 
