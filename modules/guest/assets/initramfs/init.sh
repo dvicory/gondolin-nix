@@ -47,8 +47,18 @@ fi
 
 if [ -L /newroot/nix/var/nix/profiles/system-1-link ]; then
   system_link_target=$(readlink /newroot/nix/var/nix/profiles/system-1-link || true)
-  if [ -n "$system_link_target" ] && [ -x "/newroot$system_link_target/init" ]; then
-    exec switch_root /newroot "$system_link_target/init"
+  if [ -n "$system_link_target" ]; then
+    # Prefer the stage-2 script: with systemd-in-initrd configs the toplevel
+    # `init` is the raw systemd binary and the stage-2 script (which runs the
+    # NixOS activation script before exec'ing systemd) lives at
+    # `prepare-root`. The NixOS systemd initrd is what normally invokes it;
+    # this custom initramfs must do so itself or activation never runs.
+    if [ -x "/newroot$system_link_target/prepare-root" ]; then
+      exec switch_root /newroot "$system_link_target/prepare-root"
+    fi
+    if [ -x "/newroot$system_link_target/init" ]; then
+      exec switch_root /newroot "$system_link_target/init"
+    fi
   fi
 fi
 
