@@ -41,6 +41,10 @@ in
     # guest networking among other things. Immutable users bake the account
     # files statically into the /etc tree instead.
     users.mutableUsers = false;
+    # Nobody logs into a disposable sandbox: no passwords, no SSH keys.
+    # Guest access is exclusively the sandboxd exec channel, so the
+    # lockout this assertion guards against is precisely what we want.
+    users.allowNoPasswordLogin = true;
 
     # Baseline userland for guest shells and execs. The guest never runs
     # NixOS system activation, so /run/current-system (which /etc/profile
