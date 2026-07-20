@@ -46,9 +46,7 @@ in
     # lockout this assertion guards against is precisely what we want.
     users.allowNoPasswordLogin = true;
 
-    # Baseline userland for guest shells and execs. The guest never runs
-    # NixOS system activation, so /run/current-system (which /etc/profile
-    # puts on PATH) is wired up via the tmpfiles links below instead.
+    # Baseline userland for guest shells and execs.
     environment.systemPackages = with pkgs; [
       coreutils
       curl
@@ -63,12 +61,33 @@ in
       util-linux
     ];
 
+    # Trust the SDK-provided MITM CA for hook-mediated egress. The CA is
+    # dynamic (host-generated per cert dir) and only exists at runtime,
+    # mounted read-only at /etc/gondolin/mitm/ca.crt — the build-time
+    # security.pki bundle cannot include it. Instead, login-shell execs
+    # (how agents enter) lazily assemble a combined bundle and export the
+    # standard trust variables: OpenSSL/curl/git (SSL_CERT_FILE), Nix tools
+    # (NIX_SSL_CERT_FILE), python-requests (REQUESTS_CA_BUNDLE), and Node
+    # (NODE_EXTRA_CA_CERTS, additive to its built-in store). Absent the
+    # mount (vfs-off guests) everything stays at defaults.
+    environment.shellInit = ''
+      if [ -r /etc/gondolin/mitm/ca.crt ]; then
+        if [ ! -s /run/gondolin-ca/combined.pem ] || [ /etc/gondolin/mitm/ca.crt -nt /run/gondolin-ca/combined.pem ]; then
+          mkdir -p /run/gondolin-ca
+          cat /etc/ssl/certs/ca-certificates.crt /etc/gondolin/mitm/ca.crt > "/run/gondolin-ca/.combined.$$" 2>/dev/null \
+            && mv "/run/gondolin-ca/.combined.$$" /run/gondolin-ca/combined.pem
+        fi
+        if [ -s /run/gondolin-ca/combined.pem ]; then
+          export SSL_CERT_FILE=/run/gondolin-ca/combined.pem
+          export NIX_SSL_CERT_FILE="$SSL_CERT_FILE"
+          export GIT_SSL_CAINFO="$SSL_CERT_FILE"
+          export REQUESTS_CA_BUNDLE="$SSL_CERT_FILE"
+          export NODE_EXTRA_CA_CERTS=/etc/gondolin/mitm/ca.crt
+        fi
+      fi
+    '';
+
     systemd.tmpfiles.rules = [
-      # Indirect through the profile link the rootfs builder creates;
-      # referencing config.system.build.toplevel here would recurse
-      # (tmpfiles rules contribute to the toplevel derivation itself).
-      "L+ /run/current-system - - - - /nix/var/nix/profiles/system"
-      "L+ /run/booted-system - - - - /nix/var/nix/profiles/system"
       "d /root 0700 root root -"
     ];
 
