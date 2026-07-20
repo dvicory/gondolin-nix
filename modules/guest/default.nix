@@ -34,6 +34,14 @@ in
     boot.loader.grub.devices = lib.mkDefault [ "/dev/vda" ];
     system.stateVersion = lib.mkDefault "25.11";
 
+    # The guest never runs NixOS system activation, which is what normally
+    # provisions /etc/passwd, /etc/group, and /etc/shadow. Without those,
+    # every unit that runs as a system user fails at USER-spawning
+    # (dhcpcd, dbus-broker, nscd, systemd-timesyncd, ...), which takes down
+    # guest networking among other things. Immutable users bake the account
+    # files statically into the /etc tree instead.
+    users.mutableUsers = false;
+
     # Baseline userland for guest shells and execs. The guest never runs
     # NixOS system activation, so /run/current-system (which /etc/profile
     # puts on PATH) is wired up via the tmpfiles links below instead.
