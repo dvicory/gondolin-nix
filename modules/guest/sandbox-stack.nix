@@ -79,6 +79,15 @@ let
       IFS="$old_ifs"
     fi
 
+    # Seed the runtime CA bundle the system trust symlinks point at
+    # (static bundle + SDK MITM CA when mounted). Login shells refresh it
+    # if the MITM mount lands after this seed.
+    mkdir -p /run/gondolin-ca
+    cp ${config.security.pki.caBundle} /run/gondolin-ca/combined.pem
+    if [ -r /etc/gondolin/mitm/ca.crt ]; then
+      cat /etc/gondolin/mitm/ca.crt >> /run/gondolin-ca/combined.pem
+    fi
+
     exec ${gondolinGuestBins}/bin/sandboxd
   '';
 in

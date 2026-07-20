@@ -64,26 +64,29 @@ in
     # Trust the SDK-provided MITM CA for hook-mediated egress. The CA is
     # dynamic (host-generated per cert dir) and only exists at runtime,
     # mounted read-only at /etc/gondolin/mitm/ca.crt — the build-time
-    # security.pki bundle cannot include it. Instead, login-shell execs
-    # (how agents enter) lazily assemble a combined bundle and export the
-    # standard trust variables: OpenSSL/curl/git (SSL_CERT_FILE), Nix tools
-    # (NIX_SSL_CERT_FILE), python-requests (REQUESTS_CA_BUNDLE), and Node
-    # (NODE_EXTRA_CA_CERTS, additive to its built-in store). Absent the
-    # mount (vfs-off guests) everything stays at defaults.
+    # security.pki bundle cannot include it. Retarget the canonical
+    # system bundle symlinks at a runtime-assembled combined bundle
+    # (static bundle + MITM CA) so every tool that resolves the system
+    # trust store — curl (incl. CURL_CA_BUNDLE), git, OpenSSL — trusts the
+    # mediation without per-tool env spray. The stack service seeds the
+    # combined file at boot; login shells refresh it when the MITM mount
+    # lands after boot. Only stores that never consult system paths keep
+    # explicit variables: python-requests/certifi and Node.
+    environment.etc."ssl/certs/ca-certificates.crt".source = lib.mkForce "/run/gondolin-ca/combined.pem";
+    environment.etc."ssl/certs/ca-bundle.crt".source = lib.mkForce "/run/gondolin-ca/combined.pem";
+    environment.etc."pki/tls/certs/ca-bundle.crt".source = lib.mkForce "/run/gondolin-ca/combined.pem";
+
     environment.shellInit = ''
       if [ -r /etc/gondolin/mitm/ca.crt ]; then
         if [ ! -s /run/gondolin-ca/combined.pem ] || [ /etc/gondolin/mitm/ca.crt -nt /run/gondolin-ca/combined.pem ]; then
           mkdir -p /run/gondolin-ca
-          cat /etc/ssl/certs/ca-certificates.crt /etc/gondolin/mitm/ca.crt > "/run/gondolin-ca/.combined.$$" 2>/dev/null \
+          cat ${config.security.pki.caBundle} /etc/gondolin/mitm/ca.crt > "/run/gondolin-ca/.combined.$$" 2>/dev/null \
             && mv "/run/gondolin-ca/.combined.$$" /run/gondolin-ca/combined.pem
         fi
-        if [ -s /run/gondolin-ca/combined.pem ]; then
-          export SSL_CERT_FILE=/run/gondolin-ca/combined.pem
-          export NIX_SSL_CERT_FILE="$SSL_CERT_FILE"
-          export GIT_SSL_CAINFO="$SSL_CERT_FILE"
-          export REQUESTS_CA_BUNDLE="$SSL_CERT_FILE"
-          export NODE_EXTRA_CA_CERTS=/etc/gondolin/mitm/ca.crt
-        fi
+      fi
+      if [ -s /run/gondolin-ca/combined.pem ]; then
+        export REQUESTS_CA_BUNDLE=/run/gondolin-ca/combined.pem
+        export NODE_EXTRA_CA_CERTS=/etc/gondolin/mitm/ca.crt
       fi
     '';
 
